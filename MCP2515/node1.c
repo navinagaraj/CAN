@@ -4,6 +4,7 @@
 /* Filename	    : node1.c               */
 /* Description	: node1 file            */
 /****************************************/
+
 #include "header.h"
 #include "define.h"
 
@@ -26,13 +27,13 @@ void print_uart(const unsigned char *str);
 void uart_tx(unsigned char val);
 unsigned char uart_rc(void);
 
-void MCP_init();
-void MCP_2515_write(unsigned char reg, unsigned char value);
+unsigned char MCP_init();
 unsigned char MCP_2515_read(unsigned char reg);
-unsigned char MCP_BIT_MODIF(unsigned char address,unsigned char mask,unsigned char data);
-unsigned char MCP_DATA_TX_BUFFER(unsigned char );
-unsigned char MCP_DATA_RX_BUFFER(unsigned char);
-unsigned char MCP_REQUEST_TO_SEND(unsigned char);
+void MCP_2515_write(unsigned char reg, unsigned char value);
+unsigned char MCP_bit_modify(unsigned char address,unsigned char mask,unsigned char data);
+unsigned char MCP_data_tx_buffer(unsigned char );
+unsigned char MCP_data_rx_buffer(unsigned char);
+unsigned char MCP_request_to_send(unsigned char);
 
 
 int main()
@@ -53,13 +54,14 @@ int main()
 	else{
 		print_uart("MCP is not initialized\r\n");
 	}
-	
-	MCP_DATA_TX_BUFFER(0);
-	reciv = MCP_DATA_RX_BUFFER(0);
+	while(1)
+	{
+	MCP_data_tx_buffer(0);
+	reciv = MCP_data_rx_buffer(0);
 	sprintf(arr,"Recive data =\n\r",reciv);
 	print_uart(arr);
-	
-	while(1);
+	__delay_ms(500);
+	}
 }
 unsigned char SPI_read()
 {
@@ -150,29 +152,28 @@ void uart_init(void)
 	print_uart(message2);	/*	ACKNOWLEDGEMENT	   */
 }
 
-void MCP_init()
-{
-		MCP_BIT_MODIF(0x3F,0xFF,0x90); /* CANCTRL :CONTROL REGISTER */
+unsigned char MCP_init()
+{		
+ 		MCP_2515_write(0x3F,0x90); /* CANCTRL :CONTROL REGISTER */
+		
+		MCP_2515_write(0x0D,0x07); /* TXRTSCTRL :TRANSMIT PIN CONTROL AND STATUS REGISTER */
+		MCP_2515_write(0x30,0x02); /* TXB0CTRL  :TRANSMIT BUFFER CONTROL REGISTER */
+	    MCP_2515_write(0x40,0x02); /* TXB1CTRL  :TRANSMIT BUFFER CONTROL REGISTER */
+	    MCP_2515_write(0x50,0x02); /* TXB2CTRL  :TRANSMIT BUFFER CONTROL REGISTER */
 		
 		
-		MCP_BIT_MODIF(0x0D,0xFF,0x07); /* TXRTSCTRL :TRANSMIT PIN CONTROL AND STATUS REGISTER */
-		MCP_BIT_MODIF(0x30,0xFF,0x02); /* TXB0CTRL  :TRANSMIT BUFFER CONTROL REGISTER */
-		MCP_BIT_MODIF(0x40,0xFF,0x02); /* TXB1CTRL  :TRANSMIT BUFFER CONTROL REGISTER */
-		MCP_BIT_MODIF(0x50,0xFF,0x02); /* TXB2CTRL  :TRANSMIT BUFFER CONTROL REGISTER */
+	    MCP_2515_write(0x0C,0x0F); /* BFPCTRL  :RECEIVE PIN CONTROL AND STATUS REGISTER */
+		MCP_2515_write(0x60,0x00); /* RXB0CTRL :RECEIVE BUFFER CONTROL REGISTER */
+		MCP_2515_write(0x70,0x00); /* RXB1CTRL :RECEIVE BUFFER CONTROL REGISTER */
 		
 		
-		MCP_BIT_MODIF(0x0C,0xFF,0x0F); /* BFPCTRL  :RECEIVE PIN CONTROL AND STATUS REGISTER */
-		MCP_BIT_MODIF(0x60,0xFF,0x00); /* RXB0CTRL :RECEIVE BUFFER CONTROL REGISTER */
-		MCP_BIT_MODIF(0x70,0xFF,0x00); /* RXB1CTRL :RECEIVE BUFFER CONTROL REGISTER */
+		MCP_2515_write(0x2A,0x01); /* CNF1 :CONFIGURATION REGISTER 1 */
+		MCP_2515_write(0x29,0x00); /* CNF2 :CONFIGURATION REGISTER 2 */
+		MCP_2515_write(0x28,0x00); /* CNF3  :CONFIGURATION REGISTER 3 */
 		
-		
-		MCP_BIT_MODIF(0x2A,0xFF,0x01); /* CNF1 :CONFIGURATION REGISTER 1 */
-		MCP_BIT_MODIF(0x29,0xFF,0x00); /* CNF2 :CONFIGURATION REGISTER 2 */
-		MCP_BIT_MODIF(0x28,0xFF,0x00); /* CNF3 :CONFIGURATION REGISTER 3 */
-		
-		MCP_BIT_MODIF(0x2B,0xFF,0x00); /* CANINTE :CAN INTERRUPT ENABLE REGISTER */
-		MCP_BIT_MODIF(0x2C,0xFF,0x00); /* CANINTF :CAN INTERRUPT FLAG REGISTER */
-
+		MCP_2515_write(0x2B,0x00); /* CANINTE :CAN INTERRUPT ENABLE REGISTER */
+		MCP_2515_write(0x2C,0x00); /* CANINTF :CAN INTERRUPT FLAG REGISTER */
+		return 0;
 }
 unsigned char MCP_2515_read(unsigned char reg)
 {
@@ -196,7 +197,7 @@ void MCP_2515_write(unsigned char reg, unsigned char value)
 		CS_pin	  = 1;  					/* 	chip select  */
 }
 
-unsigned char MCP_BIT_MODIF(unsigned char add,unsigned char mask,unsigned char data)
+unsigned char MCP_bit_modify(unsigned char add,unsigned char mask,unsigned char data)
 {
 		CS_pin	  = 0;				/* chip select  */
 		spi_transfer(BIT_MODIF_INS);/* Instruction BIT_MODIF_INS  0x05 */
@@ -206,7 +207,7 @@ unsigned char MCP_BIT_MODIF(unsigned char add,unsigned char mask,unsigned char d
 		CS_pin	  = 1;				/* chip select  */
 		return 0;
 }
-unsigned char MCP_REQUEST_TO_SEND(unsigned char data)
+unsigned char MCP_request_to_send(unsigned char data)
 {
 	if(data == 0|| data == 3){
 		CS_pin	  = 0;/* chip select  */
@@ -225,7 +226,7 @@ unsigned char MCP_REQUEST_TO_SEND(unsigned char data)
 	}
 	return 0;
 }
-unsigned char MCP_DATA_TX_BUFFER(unsigned char data)
+unsigned char MCP_data_tx_buffer(unsigned char data)
 {
 	if(data == 0)
 	{
@@ -242,7 +243,7 @@ unsigned char MCP_DATA_TX_BUFFER(unsigned char data)
 	MCP_2515_write(0x3B, 0); /* TRANSMIT BUFFER 5 DATA BYTE m REGISTER */
 	MCP_2515_write(0x3C, 0); /* TRANSMIT BUFFER 6 DATA BYTE m REGISTER */
 	MCP_2515_write(0x3D, 0); /* TRANSMIT BUFFER 7 DATA BYTE m REGISTER */
-	MCP_REQUEST_TO_SEND(0);/* Message Request-to-Send */
+	MCP_request_to_send(0);/* Message Request-to-Send */
 	}
 	if(data == 1){
 	MCP_2515_write(0x41, 0xFF);	/* TRANSMIT BUFFER 1 STANDARD IDENTIFIER REGISTER HIGH */
@@ -258,7 +259,7 @@ unsigned char MCP_DATA_TX_BUFFER(unsigned char data)
 	MCP_2515_write(0x4B, 0); /* TRANSMIT BUFFER 5 DATA BYTE m REGISTER */
 	MCP_2515_write(0x4C, 0); /* TRANSMIT BUFFER 6 DATA BYTE m REGISTER */
 	MCP_2515_write(0x4D, 0); /* TRANSMIT BUFFER 7 DATA BYTE m REGISTER */
-	MCP_REQUEST_TO_SEND(0);/* Message Request-to-Send */
+	MCP_request_to_send(0);/* Message Request-to-Send */
 	}
 	if(data == 2){
 	MCP_2515_write(0x51, 0xFF);	/* TRANSMIT BUFFER 2 STANDARD IDENTIFIER REGISTER HIGH */
@@ -274,12 +275,12 @@ unsigned char MCP_DATA_TX_BUFFER(unsigned char data)
 	MCP_2515_write(0x5B, 0); /* TRANSMIT BUFFER 5 DATA BYTE m REGISTER */
 	MCP_2515_write(0x5C, 0); /* TRANSMIT BUFFER 6 DATA BYTE m REGISTER */
 	MCP_2515_write(0x5D, 0); /* TRANSMIT BUFFER 7 DATA BYTE m REGISTER */
-	MCP_REQUEST_TO_SEND(0);/* Message Request-to-Send */
+	MCP_request_to_send(0);/* Message Request-to-Send */
 	}
 	return 0;
 }
 
-unsigned char MCP_DATA_RX_BUFFER(unsigned char data)
+unsigned char MCP_data_rx_buffer(unsigned char data)
 {
 	if(data == 0){
 	unsigned int add_rx_buffer[]={0x66,0x67,0x68,0x69,0x6A,0x6B,0x6C,0x6D};
