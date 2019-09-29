@@ -1,6 +1,6 @@
 /****************************************/
 /* Author	    : Naveenkumar N         */
-/* Date		    : 25-09-2019            */
+/* Date		    : 29-09-2019            */
 /* Filename	    : node1.c               */
 /* Description	: node1 file            */
 /****************************************/
@@ -11,71 +11,59 @@ __CONFIG(FOSC_HS & WDTE_OFF & PWRTE_OFF & BOREN_ON & LVP_OFF);
 
 unsigned char  message2[] ="UART initialized.....\n\r";
 unsigned char  message1[] ="SPI Initializing ....\n\r";
-unsigned char  check,reciv,res =0XC0,ins = 0x03,add = 0x0E,arr[30],arr1[30],arr2[30],err[30];
+volatile unsigned char  reciv;
+unsigned char arr[30];
+
 void delay();
 void spi_init(void);
 unsigned char spi_transfer(unsigned char data);
+unsigned char SPI_data_ready();
+void SPI_write(unsigned char);
+unsigned char SPI_read();
+
+void uart_init(void);
 void print_uart(const unsigned char *str);
 void uart_tx(unsigned char val);
 unsigned char uart_rc(void);
-void uart_init(void);
-void SPI_wait();
-unsigned char SPI_read();
-void SPI_write(unsigned char);
-unsigned char SPI_data_ready();
+
+void MCP_init();
 void MCP_2515_write(unsigned char reg, unsigned char value);
 unsigned char MCP_2515_read(unsigned char reg);
-unsigned char BIT_MODIF(unsigned char address,unsigned char mask,unsigned char data);
-unsigned char CAN_DATA_TX_BUFFER_0(unsigned char );
-unsigned char CAN_DATA_TX_BUFFER_1(unsigned char );
-unsigned char CAN_DATA_TX_BUFFER_2(unsigned char );
-unsigned char CAN_DATA_RX_BUFFER_0();
-unsigned char CAN_DATA_RX_BUFFER_1();
-unsigned char RTS(unsigned char);
+unsigned char MCP_BIT_MODIF(unsigned char address,unsigned char mask,unsigned char data);
+unsigned char MCP_DATA_TX_BUFFER(unsigned char );
+unsigned char MCP_DATA_RX_BUFFER(unsigned char);
+unsigned char MCP_REQUEST_TO_SEND(unsigned char);
 
 
 int main()
 {
-	
 	GIE		=  0; /* GLOBAL INTERRUPT ENABLE */
 	PEIE 	=  0; /* PHERIPHERAL INTERRUPT ENABLE */
 	uart_init();  /* UART INITIALIZEING */
 	spi_init();	  /* SPI  INITIALIZEING */
 	delay();
+	
+	MCP_init();	/* MCP INITIALIZEING */
+	
 	reciv =  MCP_2515_read(MCP_CANSTAT_REG);
+	
 	if((0xE0 & reciv) == MCP_CONFIG_MODE){
 			print_uart("MCP is initialized and Entered CONFIG mode\r\n");
 	}
 	else{
 		print_uart("MCP is not initialized\r\n");
-	}	
+	}
 	
-		BIT_MODIF(0x3F,0xFF,0x90); /* CANCTRL :CONTROL REGISTER */
+	MCP_DATA_TX_BUFFER(0);
+	reciv = MCP_DATA_RX_BUFFER(0);
+	sprintf(arr,"Recive data =\n\r",reciv);
+	print_uart(arr);
 	
-	
-		BIT_MODIF(0x0D,0xFF,0x07); /* TXRTSCTRL :TRANSMIT PIN CONTROL AND STATUS REGISTER */
-		BIT_MODIF(0x30,0xFF,0x02); /* TXB0CTRL  :TRANSMIT BUFFER CONTROL REGISTER */
-		BIT_MODIF(0x40,0xFF,0x02); /* TXB1CTRL  :TRANSMIT BUFFER CONTROL REGISTER */
-		BIT_MODIF(0x50,0xFF,0x02); /* TXB2CTRL  :TRANSMIT BUFFER CONTROL REGISTER */
-		
-		
-		BIT_MODIF(0x0C,0xFF,0x0F); /* BFPCTRL  :RECEIVE PIN CONTROL AND STATUS REGISTER */
-		BIT_MODIF(0x60,0xFF,0x00); /* RXB0CTRL :RECEIVE BUFFER CONTROL REGISTER */
-		BIT_MODIF(0x70,0xFF,0x00); /* RXB1CTRL :RECEIVE BUFFER CONTROL REGISTER */
-		
-		
-		BIT_MODIF(0x2A,0xFF,0x01); /* CNF1 :CONFIGURATION REGISTER 1 */
-		BIT_MODIF(0x29,0xFF,0x00); /* CNF2 :CONFIGURATION REGISTER 2 */
-		BIT_MODIF(0x28,0xFF,0x00); /* CNF3 :CONFIGURATION REGISTER 3 */
-		
-		BIT_MODIF(0x2B,0xFF,0x00); /* CANINTE :CAN INTERRUPT ENABLE REGISTER */
-		BIT_MODIF(0x2C,0xFF,0x00); /* CANINTF :CAN INTERRUPT FLAG REGISTER */
-		
-        
+	while(1);
 }
 unsigned char SPI_read()
 {
-	SPI_wait();
+	delay();
 	return SSPBUF;
 }
 void spi_init(void)
@@ -123,15 +111,15 @@ void print_uart(const unsigned char *str)
 
 void delay()
 {
-		TMR1CS  = 0;	
-		T1CKPS0 = 1;
-		T1CKPS1 = 1;
-		TMR1H   = 0XFA;
-		TMR1L   = 0XB0;
-		TMR1ON  = 1;
+		TMR1CS  = 0; /*  Timer1 Clock Source Select bit */
+		T1CKPS0 = 1; /*  Timer1 Input Clock Prescale Select bits */
+		T1CKPS1 = 1; /*  Timer1 Input Clock Prescale Select bits */
+		TMR1H   = 0XFA; /* Timer1 high value */
+		TMR1L   = 0XB0;	/* Timer1 low value */
+		TMR1ON  = 1; /* Timer1 On bit */
 		while(!TMR1IF);
-		TMR1IF  = 0;
-		TMR1ON  = 0;
+		TMR1IF  = 0; /* Timer1 interrupt bit */
+		TMR1ON  = 0; /* Timer1 off bit */
 }
 void uart_tx(unsigned char val)
 {
@@ -162,7 +150,30 @@ void uart_init(void)
 	print_uart(message2);	/*	ACKNOWLEDGEMENT	   */
 }
 
+void MCP_init()
+{
+		MCP_BIT_MODIF(0x3F,0xFF,0x90); /* CANCTRL :CONTROL REGISTER */
+		
+		
+		MCP_BIT_MODIF(0x0D,0xFF,0x07); /* TXRTSCTRL :TRANSMIT PIN CONTROL AND STATUS REGISTER */
+		MCP_BIT_MODIF(0x30,0xFF,0x02); /* TXB0CTRL  :TRANSMIT BUFFER CONTROL REGISTER */
+		MCP_BIT_MODIF(0x40,0xFF,0x02); /* TXB1CTRL  :TRANSMIT BUFFER CONTROL REGISTER */
+		MCP_BIT_MODIF(0x50,0xFF,0x02); /* TXB2CTRL  :TRANSMIT BUFFER CONTROL REGISTER */
+		
+		
+		MCP_BIT_MODIF(0x0C,0xFF,0x0F); /* BFPCTRL  :RECEIVE PIN CONTROL AND STATUS REGISTER */
+		MCP_BIT_MODIF(0x60,0xFF,0x00); /* RXB0CTRL :RECEIVE BUFFER CONTROL REGISTER */
+		MCP_BIT_MODIF(0x70,0xFF,0x00); /* RXB1CTRL :RECEIVE BUFFER CONTROL REGISTER */
+		
+		
+		MCP_BIT_MODIF(0x2A,0xFF,0x01); /* CNF1 :CONFIGURATION REGISTER 1 */
+		MCP_BIT_MODIF(0x29,0xFF,0x00); /* CNF2 :CONFIGURATION REGISTER 2 */
+		MCP_BIT_MODIF(0x28,0xFF,0x00); /* CNF3 :CONFIGURATION REGISTER 3 */
+		
+		MCP_BIT_MODIF(0x2B,0xFF,0x00); /* CANINTE :CAN INTERRUPT ENABLE REGISTER */
+		MCP_BIT_MODIF(0x2C,0xFF,0x00); /* CANINTF :CAN INTERRUPT FLAG REGISTER */
 
+}
 unsigned char MCP_2515_read(unsigned char reg)
 {
 		CS_pin	  = 0;  			/* chip select  */
@@ -185,7 +196,7 @@ void MCP_2515_write(unsigned char reg, unsigned char value)
 		CS_pin	  = 1;  					/* 	chip select  */
 }
 
-unsigned char BIT_MODIF(unsigned char address,unsigned char mask,unsigned char data)
+unsigned char MCP_BIT_MODIF(unsigned char add,unsigned char mask,unsigned char data)
 {
 		CS_pin	  = 0;				/* chip select  */
 		spi_transfer(BIT_MODIF_INS);/* Instruction BIT_MODIF_INS  0x05 */
@@ -195,7 +206,7 @@ unsigned char BIT_MODIF(unsigned char address,unsigned char mask,unsigned char d
 		CS_pin	  = 1;				/* chip select  */
 		return 0;
 }
-unsigned char RTS(unsigned char data)
+unsigned char MCP_REQUEST_TO_SEND(unsigned char data)
 {
 	if(data == 0|| data == 3){
 		CS_pin	  = 0;/* chip select  */
@@ -212,11 +223,12 @@ unsigned char RTS(unsigned char data)
 		spi_transfer(RTS2);	/* Message Request-to-Send ( 0b1000 0000 )=>LSB 8=0,4=Buffer2,2=Buffer1,1=Buffer0*/
 		CS_pin	  = 0;/* chip select  */
 	}
-	
+	return 0;
 }
-unsigned char CAN_DATA_TX_BUFFER_0(unsigned char data)
+unsigned char MCP_DATA_TX_BUFFER(unsigned char data)
 {
-	
+	if(data == 0)
+	{
 	MCP_2515_write(0x31, 0xFF);	/* TRANSMIT BUFFER 0 STANDARD IDENTIFIER REGISTER HIGH */
 	MCP_2515_write(0x32, 0xE0);	/* TRANSMIT BUFFER 0 STANDARD IDENTIFIER REGISTER LOW */
 	MCP_2515_write(0x33, 0x00);	/* TRANSMIT BUFFER 0 EXTENDED IDENTIFIER 8 REGISTER HIGH */
@@ -230,12 +242,9 @@ unsigned char CAN_DATA_TX_BUFFER_0(unsigned char data)
 	MCP_2515_write(0x3B, 0); /* TRANSMIT BUFFER 5 DATA BYTE m REGISTER */
 	MCP_2515_write(0x3C, 0); /* TRANSMIT BUFFER 6 DATA BYTE m REGISTER */
 	MCP_2515_write(0x3D, 0); /* TRANSMIT BUFFER 7 DATA BYTE m REGISTER */
-	RTS(0);/* Message Request-to-Send */
-	return 0;
-}
-unsigned char CAN_DATA_TX_BUFFER_1(unsigned char data)
-{
-	
+	MCP_REQUEST_TO_SEND(0);/* Message Request-to-Send */
+	}
+	if(data == 1){
 	MCP_2515_write(0x41, 0xFF);	/* TRANSMIT BUFFER 1 STANDARD IDENTIFIER REGISTER HIGH */
 	MCP_2515_write(0x42, 0xE0);	/* TRANSMIT BUFFER 1 STANDARD IDENTIFIER REGISTER LOW */
 	MCP_2515_write(0x43, 0x00);	/* TRANSMIT BUFFER 1 EXTENDED IDENTIFIER 8 REGISTER HIGH */
@@ -249,10 +258,9 @@ unsigned char CAN_DATA_TX_BUFFER_1(unsigned char data)
 	MCP_2515_write(0x4B, 0); /* TRANSMIT BUFFER 5 DATA BYTE m REGISTER */
 	MCP_2515_write(0x4C, 0); /* TRANSMIT BUFFER 6 DATA BYTE m REGISTER */
 	MCP_2515_write(0x4D, 0); /* TRANSMIT BUFFER 7 DATA BYTE m REGISTER */
-	return 0;
-}
-unsigned char CAN_DATA_TX_BUFFER_2(unsigned char data)
-{
+	MCP_REQUEST_TO_SEND(0);/* Message Request-to-Send */
+	}
+	if(data == 2){
 	MCP_2515_write(0x51, 0xFF);	/* TRANSMIT BUFFER 2 STANDARD IDENTIFIER REGISTER HIGH */
 	MCP_2515_write(0x52, 0xE0);	/* TRANSMIT BUFFER 2 STANDARD IDENTIFIER REGISTER LOW */
 	MCP_2515_write(0x53, 0x00);	/* TRANSMIT BUFFER 2 EXTENDED IDENTIFIER 8 REGISTER HIGH */
@@ -266,25 +274,31 @@ unsigned char CAN_DATA_TX_BUFFER_2(unsigned char data)
 	MCP_2515_write(0x5B, 0); /* TRANSMIT BUFFER 5 DATA BYTE m REGISTER */
 	MCP_2515_write(0x5C, 0); /* TRANSMIT BUFFER 6 DATA BYTE m REGISTER */
 	MCP_2515_write(0x5D, 0); /* TRANSMIT BUFFER 7 DATA BYTE m REGISTER */
+	MCP_REQUEST_TO_SEND(0);/* Message Request-to-Send */
+	}
 	return 0;
 }
-unsigned char CAN_DATA_RX_BUFFER_0()
+
+unsigned char MCP_DATA_RX_BUFFER(unsigned char data)
 {
-	unsigned int add_rx_buffer_0[]={0x66,0x67,0x68,0x69,0x6A,0x6B,0x6C,0x6D};
+	if(data == 0){
+	unsigned int add_rx_buffer[]={0x66,0x67,0x68,0x69,0x6A,0x6B,0x6C,0x6D};
 	unsigned char val= 0x00,rte;
 	for(int i=7 ;i>=0; i--){
-		rte = MCP_2515_read(add_rx_buffer_0[i]);
+		rte = MCP_2515_read(add_rx_buffer[i]);
 		val = ((val+rte)<<1);
 	}
 	return val;
-}
-unsigned char CAN_DATA_RX_BUFFER_1()
-{	
-	unsigned int add_rx_buffer_0[]={0x76,0x77,0x78,0x79,0x7A,0x7B,0x7C,0x7D};
+	}
+	if(data == 1){
+	unsigned int add_rx_buffer[]={0x76,0x77,0x78,0x79,0x7A,0x7B,0x7C,0x7D};
 	unsigned char val= 0x00,rte;
 	for(int i=7 ;i>=0; i--){
-		rte = MCP_2515_read(add_rx_buffer_0[i]);
+		rte = MCP_2515_read(add_rx_buffer[i]);
 		val = ((val+rte)<<1);
 	}
 	return val;
+	}
+	else
+		return 0;
 }
