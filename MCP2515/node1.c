@@ -6,7 +6,7 @@
 /****************************************/
 
 #include "header.h"
-#include "define.h"
+#include "macro.h"
 
 __CONFIG(FOSC_HS & WDTE_OFF & PWRTE_OFF & BOREN_ON & LVP_OFF);
 
@@ -58,9 +58,13 @@ int main()
 	{
 	MCP_data_tx_buffer(0);
 	reciv = MCP_data_rx_buffer(0);
-	sprintf(arr,"Recive data =\n\r",reciv);
+	sprintf(arr,"Recive data =0X%.2X\n\r",reciv);
 	print_uart(arr);
 	__delay_ms(500);
+	
+	reciv = MCP_2515_read(0x2C); /* CANINTF :CAN INTERRUPT FLAG REGISTER */
+	sprintf(arr,"CAN interrupt flag register = 0X%.2X\n\r",reciv);
+		
 	}
 }
 unsigned char SPI_read()
@@ -157,7 +161,7 @@ unsigned char MCP_init()
  		MCP_2515_write(0x3F,0x90); /* CANCTRL :CONTROL REGISTER */
 		
 		MCP_2515_write(0x0D,0x07); /* TXRTSCTRL :TRANSMIT PIN CONTROL AND STATUS REGISTER */
-		MCP_2515_write(0x30,0x02); /* TXB0CTRL  :TRANSMIT BUFFER CONTROL REGISTER */
+		MCP_2515_write(0x30,0x03); /* TXB0CTRL  :TRANSMIT BUFFER CONTROL REGISTER */
 	    MCP_2515_write(0x40,0x02); /* TXB1CTRL  :TRANSMIT BUFFER CONTROL REGISTER */
 	    MCP_2515_write(0x50,0x02); /* TXB2CTRL  :TRANSMIT BUFFER CONTROL REGISTER */
 		
@@ -171,7 +175,7 @@ unsigned char MCP_init()
 		MCP_2515_write(0x29,0x00); /* CNF2 :CONFIGURATION REGISTER 2 */
 		MCP_2515_write(0x28,0x00); /* CNF3  :CONFIGURATION REGISTER 3 */
 		
-		MCP_2515_write(0x2B,0x00); /* CANINTE :CAN INTERRUPT ENABLE REGISTER */
+		MCP_2515_write(0x2B,0x9F); /* CANINTE :CAN INTERRUPT ENABLE REGISTER */
 		MCP_2515_write(0x2C,0x00); /* CANINTF :CAN INTERRUPT FLAG REGISTER */
 		return 0;
 }
@@ -212,17 +216,17 @@ unsigned char MCP_request_to_send(unsigned char data)
 	if(data == 0|| data == 3){
 		CS_pin	  = 0;/* chip select  */
 		spi_transfer(RTS0);	/* Message Request-to-Send ( 0b1000 0000 )=>LSB 8=0,4=Buffer2,2=Buffer1,1=Buffer0*/
-		CS_pin	  = 0;/* chip select  */
+		CS_pin	  = 1;/* chip select  */
 	}
 	if(data == 1|| data == 3){
 		CS_pin	  = 0;/* chip select  */
 		spi_transfer(RTS1);	/* Message Request-to-Send ( 0b1000 0000 )=>LSB 8=0,4=Buffer2,2=Buffer1,1=Buffer0*/
-		CS_pin	  = 0;/* chip select  */
+		CS_pin	  = 1;/* chip select  */
 	}
 	if(data == 2|| data == 3){
 		CS_pin	  = 0;/* chip select  */
 		spi_transfer(RTS2);	/* Message Request-to-Send ( 0b1000 0000 )=>LSB 8=0,4=Buffer2,2=Buffer1,1=Buffer0*/
-		CS_pin	  = 0;/* chip select  */
+		CS_pin	  = 1;/* chip select  */
 	}
 	return 0;
 }
@@ -230,19 +234,21 @@ unsigned char MCP_data_tx_buffer(unsigned char data)
 {
 	if(data == 0)
 	{
+
 	MCP_2515_write(0x31, 0xFF);	/* TRANSMIT BUFFER 0 STANDARD IDENTIFIER REGISTER HIGH */
 	MCP_2515_write(0x32, 0xE0);	/* TRANSMIT BUFFER 0 STANDARD IDENTIFIER REGISTER LOW */
 	MCP_2515_write(0x33, 0x00);	/* TRANSMIT BUFFER 0 EXTENDED IDENTIFIER 8 REGISTER HIGH */
 	MCP_2515_write(0x34, 0x00);	/* TRANSMIT BUFFER 0 EXTENDED IDENTIFIER 0 REGISTER LOW */
-	MCP_2515_write(0x35, 0x00);	/* TRANSMIT BUFFER 0 DATA LENGTH CODE REGISTER */
-	MCP_2515_write(0x36, 0); /* TRANSMIT BUFFER 0 DATA BYTE m REGISTER */
-	MCP_2515_write(0x37, 0); /* TRANSMIT BUFFER 1 DATA BYTE m REGISTER */
-	MCP_2515_write(0x38, 0); /* TRANSMIT BUFFER 2 DATA BYTE m REGISTER */
+	MCP_2515_write(0x35, 0x0F);	/* TRANSMIT BUFFER 0 DATA LENGTH CODE REGISTER */
+	MCP_2515_write(0x36, 1); /* TRANSMIT BUFFER 0 DATA BYTE m REGISTER */
+	MCP_2515_write(0x37, 1); /* TRANSMIT BUFFER 1 DATA BYTE m REGISTER */
+	MCP_2515_write(0x38, 1); /* TRANSMIT BUFFER 2 DATA BYTE m REGISTER */
 	MCP_2515_write(0x39, 1); /* TRANSMIT BUFFER 3 DATA BYTE m REGISTER */
 	MCP_2515_write(0x3A, 1); /* TRANSMIT BUFFER 4 DATA BYTE m REGISTER */
-	MCP_2515_write(0x3B, 0); /* TRANSMIT BUFFER 5 DATA BYTE m REGISTER */
-	MCP_2515_write(0x3C, 0); /* TRANSMIT BUFFER 6 DATA BYTE m REGISTER */
-	MCP_2515_write(0x3D, 0); /* TRANSMIT BUFFER 7 DATA BYTE m REGISTER */
+	MCP_2515_write(0x3B, 1); /* TRANSMIT BUFFER 5 DATA BYTE m REGISTER */
+	MCP_2515_write(0x3C, 1); /* TRANSMIT BUFFER 6 DATA BYTE m REGISTER */
+	MCP_2515_write(0x3D, 1); /* TRANSMIT BUFFER 7 DATA BYTE m REGISTER */
+	
 	MCP_request_to_send(0);/* Message Request-to-Send */
 	}
 	if(data == 1){
